@@ -59,7 +59,6 @@
 #include "as_message.h"
 #include "common/utils/nr/nr_common.h"
 
-#define NB_NR_UE_INST 1
 #define NB_CNX_UE 2//MAX_MANAGED_RG_PER_MOBILE
 #define MAX_MEAS_OBJ 7
 #define MAX_MEAS_CONFIG 7
@@ -83,7 +82,7 @@ typedef enum Rrc_State_NR_e {
   RRC_STATE_IDLE_NR = 0,
   RRC_STATE_INACTIVE_NR,
   RRC_STATE_CONNECTED_NR,
-
+  RRC_STATE_DETACH_NR,
   RRC_STATE_FIRST_NR = RRC_STATE_IDLE_NR,
   RRC_STATE_LAST_NR = RRC_STATE_CONNECTED_NR,
 } Rrc_State_NR_t;
@@ -206,8 +205,7 @@ typedef struct rrcPerNB {
 } rrcPerNB_t;
 
 typedef struct NR_UE_RRC_INST_s {
-  NR_MeasConfig_t        *meas_config;
-
+  instance_t ue_id;
   rrcPerNB_t perNB[NB_CNX_UE];
 
   char                           *uecap_file;

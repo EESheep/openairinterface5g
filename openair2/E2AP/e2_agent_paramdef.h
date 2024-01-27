@@ -19,27 +19,24 @@
  *      contact@openairinterface.org
  */
 
-/*!\file PHY/CODING/nrSmallBlock/encodeSmallBlock.c
- * \brief
- * \author Turker Yilmaz
- * \date 2019
- * \version 0.1
- * \company EURECOM
- * \email turker.yilmaz@eurecom.fr
- * \note
- * \warning
-*/
+#ifndef E2_AGENT_PARAMDEF_H_
+#define E2_AGENT_PARAMDEF_H_
 
-#include "PHY/CODING/nrSmallBlock/nr_small_block_defs.h"
+/* E2 Agent configuration */
+#define CONFIG_STRING_E2AGENT "e2_agent"
 
-//input = [0 ... 0 c_K-1 ... c_2 c_1 c_0]
-//output = [d_31 d_30 ... d_2 d_1 d_0]
-uint32_t encodeSmallBlock(int in, int len)
-{
-  uint32_t out = 0;
-  for (int i = 0; i < len; i++)
-    if ((in & (1 << i)) > 0)
-      out ^= nrSmallBlockBasis[i];
+#define E2AGENT_CONFIG_IP    "near_ric_ip_addr"
+#define E2AGENT_CONFIG_SMDIR "sm_dir"
 
-  return out;
+static const char* const e2agent_config_ip_default = "127.0.0.1";
+static const char* const e2agent_config_smdir_default = ".";
+
+#define E2AGENT_PARAMS_DESC { \
+  {E2AGENT_CONFIG_IP,    "RIC IP address",             0, strptr:NULL, defstrval:(char*)e2agent_config_ip_default,    TYPE_STRING, 0}, \
+  {E2AGENT_CONFIG_SMDIR, "Directory with SMs to load", 0, strptr:NULL, defstrval:(char*)e2agent_config_smdir_default, TYPE_STRING, 0}, \
 }
+
+#define E2AGENT_CONFIG_IP_IDX    0
+#define E2AGENT_CONFIG_SMDIR_IDX 1
+
+#endif 
