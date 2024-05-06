@@ -466,7 +466,7 @@ void generateRegistrationRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
   mm_msg->registration_request.presencemask |= REGISTRATION_REQUEST_UE_SECURITY_CAPABILITY_PRESENT;
   mm_msg->registration_request.nruesecuritycapability.iei = REGISTRATION_REQUEST_UE_SECURITY_CAPABILITY_IEI;
   mm_msg->registration_request.nruesecuritycapability.length = 8;
-  mm_msg->registration_request.nruesecuritycapability.fg_EA = 0x80;
+  mm_msg->registration_request.nruesecuritycapability.fg_EA = 0xa0;
   mm_msg->registration_request.nruesecuritycapability.fg_IA = 0x20;
   mm_msg->registration_request.nruesecuritycapability.EEA = 0;
   mm_msg->registration_request.nruesecuritycapability.EIA = 0;
@@ -515,6 +515,10 @@ void generateIdentityResponse(as_nas_info_t *initialNasMsg, uint8_t identitytype
 static void generateAuthenticationResp(nr_ue_nas_t *nas, as_nas_info_t *initialNasMsg, uint8_t *buf)
 {
   derive_ue_keys(buf, nas);
+  /* todo: as of now, nia2 is hardcoded in derive_ue_keys(), remove this hardcoding, use NAS signalling for getting proper algorithm */
+  /* todo: deal with ciphering for this stream_security_container_init() (handle ciphering in general) */
+  /* todo: stream_security_container_delete() is not called anywhere, deal with that */
+  nas->security_container = stream_security_container_init(0, 2 /* hardcoded: nia2 */, NULL, nas->security.knas_int);
   OctetString res;
   res.length = 16;
   res.value = calloc(1,16);
@@ -598,8 +602,7 @@ static void generateSecurityModeComplete(nr_ue_nas_t *nas, as_nas_info_t *initia
 
   initialNasMsg->length = security_header_len + mm_msg_encode(mm_msg, (uint8_t*)(initialNasMsg->data+security_header_len), size-security_header_len);
 
-  stream_cipher.key        = nas->security.knas_int;
-  stream_cipher.key_length = 16;
+  stream_cipher.context    = nas->security_container->integrity_context;
   stream_cipher.count      = nas->security.mm_counter++;
   stream_cipher.bearer     = 1;
   stream_cipher.direction  = 0;
@@ -642,8 +645,6 @@ static void decodeRegistrationAccept(const uint8_t *buf, int len, nr_ue_nas_t *n
 
 static void generateRegistrationComplete(nr_ue_nas_t *nas, as_nas_info_t *initialNasMsg, SORTransparentContainer *sortransparentcontainer)
 {
-  //wait send RRCReconfigurationComplete and InitialContextSetupResponse
-  sleep(1);
   int length = 0;
   int size = 0;
   fgs_nas_message_t nas_msg;
@@ -701,8 +702,7 @@ static void generateRegistrationComplete(nr_ue_nas_t *nas, as_nas_info_t *initia
   }
   
   initialNasMsg->length = length;
-  stream_cipher.key        = nas->security.knas_int;
-  stream_cipher.key_length = 16;
+  stream_cipher.context    = nas->security_container->integrity_context;
   stream_cipher.count      = nas->security.mm_counter++;
   stream_cipher.bearer     = 1;
   stream_cipher.direction  = 0;
@@ -764,8 +764,7 @@ static void generateDeregistrationRequest(nr_ue_nas_t *nas, as_nas_info_t *initi
   initialNasMsg->length = security_header_len + mm_msg_encode(&sp_msg->plain.mm_msg, (uint8_t *)(initialNasMsg->data + security_header_len), size - security_header_len);
 
   nas_stream_cipher_t stream_cipher = {
-    .key = nas->security.knas_int,
-    .key_length = 16,
+    .context = nas->security_container->integrity_context,
     .count = nas->security.mm_counter++,
     .bearer = 1,
     .direction = 0,
@@ -781,8 +780,6 @@ static void generateDeregistrationRequest(nr_ue_nas_t *nas, as_nas_info_t *initi
 
 static void generatePduSessionEstablishRequest(nr_ue_nas_t *nas, as_nas_info_t *initialNasMsg, nas_pdu_session_req_t *pdu_req)
 {
-  //wait send RegistrationComplete
-  usleep(100*150);
   int size = 0;
   fgs_nas_message_t nas_msg={0};
 
@@ -857,8 +854,7 @@ static void generatePduSessionEstablishRequest(nr_ue_nas_t *nas, as_nas_info_t *
 
   initialNasMsg->length = security_header_len + mm_msg_encode(mm_msg, (uint8_t*)(initialNasMsg->data+security_header_len), size-security_header_len);
 
-  stream_cipher.key        = nas->security.knas_int;
-  stream_cipher.key_length = 16;
+  stream_cipher.context    = nas->security_container->integrity_context;
   stream_cipher.count      = nas->security.mm_counter++;
   stream_cipher.bearer     = 1;
   stream_cipher.direction  = 0;
@@ -1261,6 +1257,9 @@ void *nas_nrue(void *args_p)
               offset++;
             }
           } break;
+	case FGS_PDU_SESSION_ESTABLISHMENT_REJ:
+	  LOG_E(NAS, "Received PDU Session Establishment reject\n");
+	  break;
           default:
             LOG_W(NR_RRC, "unknown message type %d\n", msg_type);
             break;

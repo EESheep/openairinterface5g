@@ -41,6 +41,7 @@
 #include "as_message.h"
 #include "FGSUplinkNasTransport.h"
 #include <openair3/UICC/usim_interface.h>
+#include "secu_defs.h"
 
 #define PLAIN_5GS_MSG                                      0b0000
 #define INTEGRITY_PROTECTED                                0b0001
@@ -65,6 +66,7 @@
 // message type for 5GS session management
 #define FGS_PDU_SESSION_ESTABLISHMENT_REQ                  0b11000001 /* 193= 0xc1 */
 #define FGS_PDU_SESSION_ESTABLISHMENT_ACC                  0b11000010 /* 194= 0xc2 */
+#define FGS_PDU_SESSION_ESTABLISHMENT_REJ                  0b11000011 /* 195= 0xc3 */
 
 #define INITIAL_REGISTRATION                               0b001
 
@@ -97,6 +99,7 @@ typedef struct {
 typedef struct {
   uicc_t *uicc;
   ue_sa_security_key_t security;
+  stream_security_container_t *security_container;
   Guti5GSMobileIdentity_t *guti;
   bool termination_procedure;
 } nr_ue_nas_t;

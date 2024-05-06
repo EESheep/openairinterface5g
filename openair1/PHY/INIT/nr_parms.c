@@ -212,22 +212,20 @@ uint32_t get_samples_slot_timestamp(int slot, const NR_DL_FRAME_PARMS *fp, uint8
   return samp_count;
 }
 
-int nr_init_frame_parms(nfapi_nr_config_request_scf_t* cfg,
-                        NR_DL_FRAME_PARMS *fp)
+void nr_init_frame_parms(nfapi_nr_config_request_scf_t* cfg, NR_DL_FRAME_PARMS *fp)
 {
 
-  AssertFatal (cfg != NULL, "%s %s:%i Null pointer to cfg %p!\n", __FUNCTION__, __FILE__, __LINE__, cfg);
+  AssertFatal (cfg, "Null pointer to cfg!\n");
 
   fp->frame_type = cfg->cell_config.frame_duplex_type.value;
-  fp->L_ssb = (((uint64_t) cfg->ssb_table.ssb_mask_list[0].ssb_mask.value)<<32) | cfg->ssb_table.ssb_mask_list[1].ssb_mask.value ;
+  fp->L_ssb = (((uint64_t) cfg->ssb_table.ssb_mask_list[0].ssb_mask.value) << 32) | cfg->ssb_table.ssb_mask_list[1].ssb_mask.value;
   fp->N_RB_DL = cfg->carrier_config.dl_grid_size[cfg->ssb_config.scs_common.value].value;
   fp->N_RB_UL = cfg->carrier_config.ul_grid_size[cfg->ssb_config.scs_common.value].value;
 
   int Ncp = NFAPI_CP_NORMAL;
   int mu = cfg->ssb_config.scs_common.value;
 
-
-  LOG_I(PHY,"Initializing frame parms for mu %d, N_RB %d, Ncp %d\n",mu, fp->N_RB_DL, Ncp);
+  LOG_I(PHY,"Initializing frame parms for mu %d, N_RB %d, Ncp %d\n", mu, fp->N_RB_DL, Ncp);
 
   if (Ncp == NFAPI_CP_EXTENDED)
     AssertFatal(mu == NR_MU_2,"Invalid cyclic prefix %d for numerology index %d\n", Ncp, mu);
@@ -254,7 +252,7 @@ int nr_init_frame_parms(nfapi_nr_config_request_scf_t* cfg,
   fp->get_samples_slot_timestamp = &get_samples_slot_timestamp;
   fp->get_slot_from_timestamp = &get_slot_from_timestamp;
   fp->samples_per_frame = 10 * fp->samples_per_subframe;
-  fp->freq_range = (fp->dl_CarrierFreq < 6e9)? nr_FR1 : nr_FR2;
+  fp->freq_range = (fp->dl_CarrierFreq < 6e9)? FR1 : FR2;
 
   fp->Ncp = Ncp;
 
@@ -266,8 +264,7 @@ int nr_init_frame_parms(nfapi_nr_config_request_scf_t* cfg,
   for (int p=0; p<num_tx_ant; p++)
     fp->N_ssb += ((fp->L_ssb >> (63-p)) & 0x01);
 
-  return 0;
-
+  fp->print_ue_help_cmdline_log = true;
 }
 
 int nr_init_frame_parms_ue(NR_DL_FRAME_PARMS *fp,
@@ -344,12 +341,12 @@ int nr_init_frame_parms_ue(NR_DL_FRAME_PARMS *fp,
   fp->get_samples_per_slot = &get_samples_per_slot;
   fp->get_samples_slot_timestamp = &get_samples_slot_timestamp;
   fp->samples_per_frame = 10 * fp->samples_per_subframe;
-  fp->freq_range = (fp->dl_CarrierFreq < 6e9)? nr_FR1 : nr_FR2;
+  fp->freq_range = (fp->dl_CarrierFreq < 6e9)? FR1 : FR2;
 
   uint8_t sco = 0;
-  if (((fp->freq_range == nr_FR1) && (config->ssb_table.ssb_subcarrier_offset < 24)) ||
-      ((fp->freq_range == nr_FR2) && (config->ssb_table.ssb_subcarrier_offset < 12))) {
-    if (fp->freq_range == nr_FR1)
+  if (((fp->freq_range == FR1) && (config->ssb_table.ssb_subcarrier_offset < 24)) ||
+      ((fp->freq_range == FR2) && (config->ssb_table.ssb_subcarrier_offset < 12))) {
+    if (fp->freq_range == FR1)
       sco = config->ssb_table.ssb_subcarrier_offset>>config->ssb_config.scs_common;
     else
       sco = config->ssb_table.ssb_subcarrier_offset;
@@ -382,7 +379,7 @@ void nr_init_frame_parms_ue_sa(NR_DL_FRAME_PARMS *frame_parms, uint64_t downlink
   frame_parms->numerology_index = mu;
   frame_parms->dl_CarrierFreq = downlink_frequency;
   frame_parms->ul_CarrierFreq = downlink_frequency + delta_duplex;
-  frame_parms->freq_range = (frame_parms->dl_CarrierFreq < 6e9)? nr_FR1 : nr_FR2;
+  frame_parms->freq_range = (frame_parms->dl_CarrierFreq < 6e9)? FR1 : FR2;
   frame_parms->N_RB_UL = frame_parms->N_RB_DL;
 
   frame_parms->nr_band = nr_band;
@@ -428,7 +425,7 @@ void nr_dump_frame_parms(NR_DL_FRAME_PARMS *fp)
   LOG_I(PHY,"fp->samples_per_frame=%d\n",fp->samples_per_frame);
   LOG_I(PHY,"fp->dl_CarrierFreq=%lu\n",fp->dl_CarrierFreq);
   LOG_I(PHY,"fp->ul_CarrierFreq=%lu\n",fp->ul_CarrierFreq);
+  LOG_I(PHY, "fp->Nid_cell=%d\n", fp->Nid_cell);
+  LOG_I(PHY, "fp->first_carrier_offset=%d\n", fp->first_carrier_offset);
+  LOG_I(PHY, "fp->ssb_start_subcarrier=%d\n", fp->ssb_start_subcarrier);
 }
-
-
-

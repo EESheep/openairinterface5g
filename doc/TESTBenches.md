@@ -9,10 +9,10 @@
 | asterix       | 172.21.16.127   | CI-Asterix-Usage      | *unused*           | 172.21.19.14                                          |
 | obelix        | 172.21.16.128   | CI-Obelix-Usage       | eNB (n40, n78), nrUE | 172.21.19.13, X300 (192.168.60.2)                   |
 | porcepix      | 172.21.16.136   | CI-Porcepix           | Executor, EPC, 5GC | --                                                    |
-| nrmodule2     | 172.21.16.139   | CI-NrModule2          | Quectel            | Quectel module                                        |
+| up2           | 172.21.19.68    | CI-UP2-Usage          | COTS UE            | Quectel RM520N                                        |
 | nepes         | 172.21.16.137   | CI-Nepes              | gNB (n78), EPC/5GC | B200mini (30C51EB)                                    |
 | ofqot         | 172.21.16.109   | CI-Ofqot              | gNB (n78)          | B200mini (30C51D4)                                    |
-| idefix        | 172.21.16.135   | CI-Idefix             | Quectel            | Quectel module                                        |
+| idefix        | 172.21.16.135   | CI-Idefix             | COTS UE            | Quectel RM500Q                                        |
 | caracal       | 172.21.16.132   | CI-Caracal            | gNB/phytest        | N300 (192.168.10.2)                                   |
 | amariue       | 172.21.16.144   | CI-Amarisoft-UE-Usage | nrUE               | Amarisoft UE simulator                                |
 | nano          | 172.21.18.48    | CI-Nano-Legacy-EPC    | Executor, EPC, adb | 2x COTS (adb)                                         |
@@ -22,7 +22,9 @@
 | nokiabox      | 172.21.19.39    | _None_                | gNB (Nokia), 5GC   | _Nokia RF integrated_                                 |
 | avra          | 172.21.16.124   | CI-Avra-Usage         | gNB (n78)          | AW2S Jaguar (192.168.80.239)                          |
 | orion         | 172.21.16.134   | CI-Orion-Build-Sanity-Check-Deploy-Test, CI-Orion-DsTester-Deploy-Test | Build | |
-| bellatrix     | 172.21.16.104   | CI-Bellatrix-RAN-Docker | Static Code Analysis | --                                                    |
+| aerial2       | 172.21.16.131   | CI-Aerial2-Usage      | gNB (PNF/Nvidia CUBB + VNF) | Foxconn RU, _Nvidia Aerial SDK integrated_   |
+| sphex         | 172.21.17.54    | CI-Sphex-Usage        | COTS UE            | Quectel RM500Q                                        |
+| matix         | 172.21.19.58    | CI-Matix-Usage        | gNB (n77)          | N310                                                  |
 
 Note: The available resources, and their current usage, is indicated here:
 - [Lockable resources of jenkins-oai](https://jenkins-oai.eurecom.fr/lockable-resources/):
@@ -153,7 +155,7 @@ information on how the images are built.
   - tests OAI 4G for 10 MHz/TM1; known to be unstable
 - [RAN-LTE-TDD-2x2-Container](https://jenkins-oai.eurecom.fr/view/RAN/job/RAN-LTE-TDD-2x2-Container/)
   ~4G-LTE
-  - obelix + N310, porcepix, nrmodule2 + Quectel
+  - obelix + N310, porcepix, up2 + Quectel
   - TM1 and TM2 test, IF4p5 fronthaul
 - [RAN-LTE-TDD-LTEBOX-Container](https://jenkins-oai.eurecom.fr/job/RAN-LTE-TDD-LTEBOX-Container/)
   ~4G-LTE
@@ -188,6 +190,14 @@ information on how the images are built.
   ~5G-NR
   - 5G-NR SA test setup: gNB on avra(RHEL9.2) + N310, OAIUE on caracal(RHEL9.1) + N310, OAI CN5G
   - OpenShift cluster for CN deployment and container images for gNB and UE deployment
+- [RAN-SA-AERIAL-CN5G](https://jenkins-oai.eurecom.fr/job/RAN-SA-AERIAL-CN5G/)
+  ~5G-NR
+  - 5G-NR SA test setup: OAI VNF  + PNF/NVIDIA CUBB on Aerial2 (U22) + Foxconn RU, sphex + COTS UE (Quectel RM500Q), OAI CN5G
+  - container images for gNB deployment
+- [RAN-SA-2x2-Module-CN5G](https://jenkins-oai.eurecom.fr/view/RAN/job/RAN-SA-2x2-Module-CN5G/)
+  ~5G-NR
+  - matix + N310 (gNB), up2 + COTS UE (Quectel RM520N), OAI 5GC deployed in docker on matix
+  - NR performance tests: 2x2 configuration, 60 MHz and 100 MHz bandwidth
 
 ### RAN-CI-NSA-Trigger
 
@@ -196,9 +206,6 @@ information on how the images are built.
 - [RAN-NSA-2x2-Module-OAIEPC](https://jenkins-oai.eurecom.fr/job/RAN-NSA-2x2-Module-OAIEPC/)
   - obelix + N310 (eNB), asterix + N310 (gNB), nrmodule2 + Quectel, porcepix w/ Magma EPC
   - LTE 2x2 and NR 2x2 (non-standalone)
-- [RAN-SA-Module-CN5G](https://jenkins-oai.eurecom.fr/view/RAN/job/RAN-SA-Module-CN5G/)
-  - asterix + N310 (gNB), nrmodule2 + Quectel, porcepix w/ OAI 5GC
-  - NR 2x2 (standalone)
 
 ## How to reproduce CI results
 
@@ -249,3 +256,96 @@ steps](../docker/README.md) and then use the docker-compose file directly.
 Some tests are run from source (e.g.
 `ci-scripts/xml_files/gnb_phytest_usrp_run.xml`), which directly give the
 options they are run with.
+
+## How to debug CI failures
+
+It is possible to debug CI failures using the generated core dump and the image
+used for the run. A script is provided (see developer instructions below) that,
+provided the core dump file, container image, and the source tree, executes
+`gdb` inside the container; using the core dump information, a developer can
+investigate the cause of failure.
+
+### Developer instructions
+
+The CI team will send you a docker image and a core dump file, and the commit
+as of which the pipeline failed. Let's assume the coredump is stored at
+`/tmp/coredump.tar.xz`, and the image is in `/tmp/oai-nr-ue.tar.gz`. First, you
+should check out the corresponding branch (or directly the commit), let's say
+in `~/oai-branch-fail`. Now, unpack the core dump, load the image into docker,
+and use the script [`docker/debug_core_image.sh`](../docker/debug_core_image.sh)
+to open gdb, as follows:
+
+```
+cd /tmp
+tar -xJf /tmp/coredump.tar.xz
+docker load < /tmp/oai-nr-ue.tar.gz
+~/oai-branch-fail/docker/debug_core_image.sh <image> /tmp/coredump ~/oai-branch-fail
+```
+
+where you replace `<image>` with the image loaded in `docker load`. The script
+will start the container and open gdb; you should see information about where
+the failure (e.g., segmentation fault) happened. If you just see `??`, the core
+dump and container image don't match. Be also on the lookout for the
+corresponding message from gdb:
+```
+warning: core file may not match specified executable file.
+```
+
+Once you quit `gdb`, the container image will be removed automatically.
+
+
+### CI team instructions
+
+The entrypoint scripts of all containers print the core pattern that is used on
+the running machine. Search for `core_pattern` at the start of the container
+logs to retrieve the possible location. Possible locations might be:
+
+- a path: the corresponding directory must be mounted in the container to be
+  writable
+- systemd-coredumpd: see [documentation](https://systemd.io/COREDUMP/)
+- abrt: see [documentation](https://abrt.readthedocs.io/en/latest/usage.html)
+- apport: see [documentation](https://wiki.ubuntu.com/Apport)
+
+See below for instructions on how to retrieve the core dump. Further, download
+the image and store it to a file using `docker save`. Make sure to pick the
+right image (Ubuntu or RHEL)!
+
+#### Core dump in a file
+
+**This is not recommended, as files could pile up and fill the system disk
+completely!** Prefer another method further down.
+
+If the core pattern is a path: it should at least include the time in the
+pattern name (suggested pattern: `/tmp/core.%e.%p.%t`) to correlate the time
+the segfault occurred with the CI logs. If you identified the core dump,
+copy the core dump from that machine; if identification is difficult, consider
+rerunning the pipeline.
+
+#### Core dump via systemd
+
+Use the first command to list all core dumps. Scroll down to the core dump of
+interest (it lists the executables in the last column; use the time to
+correlate the segfault and the CI run).  Take the PID of the executable (first
+column after the time). Dump the core dump to a location of your choice.
+
+```
+sudo coredumpctl list
+sudo coredumpctl dump <PID> > /tmp/coredump
+```
+
+#### Core dump via abrt (automatic bug reporting tool)
+
+TBD: use the documentation page for the moment.
+
+#### Core dump via apport
+
+I did not find an easy way to use apport. Anyway, the systemd approach works
+fine. So remove apport, install systemd-coredump, and verify it is the new
+coredump handler:
+```
+sudo systemctl stop apport
+sudo systemctl mask --now apport
+sudo apt install systemd-coredump
+# Verify this changed the core pattern to a pipe to systemd-coredump
+sysctl kernel.core_pattern
+```
