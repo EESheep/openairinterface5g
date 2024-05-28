@@ -38,18 +38,6 @@
 
 #define reserved 0xffff
 
-
-void reverse_n_bits(uint8_t *value, uint16_t bitlen) {
-  uint16_t j;
-  uint8_t i;
-  for(j = bitlen - 1,i = 0; j > i; j--, i++) {
-    if(((*value>>j)&1) != ((*value>>i)&1)) {
-      *value ^= (1<<j);
-      *value ^= (1<<i);
-    }
-  }
-}
-
 //38.321 Table 6.1.3.1-1
 const uint32_t NR_SHORT_BSR_TABLE[NR_SHORT_BSR_TABLE_SIZE] = {
     0,    10,    14,    20,    28,     38,     53,     74,
@@ -702,8 +690,8 @@ static const int16_t N_RA_RB[16] = {6, 3, 2, 24, 12, 6, 12, 6, 3, 24, 12, 6, 12,
 
 /* Function to get number of RBs required for prach occasion based on
  * 38.211 Table 6.3.3.2-1 */
-int16_t get_N_RA_RB (int delta_f_RA_PRACH,int delta_f_PUSCH) {
-	
+int16_t get_N_RA_RB (int delta_f_RA_PRACH, int delta_f_PUSCH)
+{
   int8_t index = 0;
   switch(delta_f_RA_PRACH) {
     case 0 :
