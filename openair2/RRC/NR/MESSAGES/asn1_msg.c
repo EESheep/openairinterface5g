@@ -80,6 +80,8 @@
 #include "NR_PCCH-Message.h"
 #include "NR_PagingRecord.h"
 #include "NR_UE-CapabilityRequestFilterNR.h"
+#include "NR_HandoverPreparationInformation.h"
+#include "NR_HandoverPreparationInformation-IEs.h"
 #include "common/utils/nr/nr_common.h"
 #if defined(NR_Rel16)
   #include "NR_SCS-SpecificCarrier.h"
@@ -150,8 +152,6 @@ typedef struct xer_sprint_string_s {
   size_t string_size;
   size_t string_index;
 } xer_sprint_string_t;
-
-extern RAN_CONTEXT_t RC;
 
 /*
  * This is a helper function for xer_sprint, which directs all incoming data
@@ -241,6 +241,7 @@ int do_SIB23_NR(rrc_gNB_carrier_data_t *carrier)
                                    100);
   AssertFatal (enc_rval.encoded > 0, "ASN1 message encoding failed (%s, %lu)!\n",
                enc_rval.failed_type->name, enc_rval.encoded);
+  ASN_STRUCT_FREE(asn_DEF_NR_BCCH_DL_SCH_Message, sib_message);
   return((enc_rval.encoded+7)/8);
 }
 
@@ -249,7 +250,6 @@ int do_RRCReject(uint8_t *const buffer)
     asn_enc_rval_t                                   enc_rval;
     NR_DL_CCCH_Message_t                             dl_ccch_msg;
     NR_RRCReject_t                                   *rrcReject;
-    NR_RejectWaitTime_t                              waitTime = 1;
 
     memset((void *)&dl_ccch_msg, 0, sizeof(NR_DL_CCCH_Message_t));
     dl_ccch_msg.message.present = NR_DL_CCCH_MessageType_PR_c1;
@@ -261,9 +261,9 @@ int do_RRCReject(uint8_t *const buffer)
 
     rrcReject->criticalExtensions.choice.rrcReject           = CALLOC(1, sizeof(struct NR_RRCReject_IEs));
     rrcReject->criticalExtensions.choice.rrcReject->waitTime = CALLOC(1, sizeof(NR_RejectWaitTime_t));
+    *rrcReject->criticalExtensions.choice.rrcReject->waitTime = 1;
 
     rrcReject->criticalExtensions.present = NR_RRCReject__criticalExtensions_PR_rrcReject;
-    rrcReject->criticalExtensions.choice.rrcReject->waitTime = &waitTime;
 
     if ( LOG_DEBUGFLAG(DEBUG_ASN1) ) {
         xer_fprint(stdout, &asn_DEF_NR_DL_CCCH_Message, (void *)&dl_ccch_msg);
@@ -277,6 +277,7 @@ int do_RRCReject(uint8_t *const buffer)
 
     AssertFatal(enc_rval.encoded > 0, "ASN1 message encoding failed (%s, %lu)!\n",
                 enc_rval.failed_type->name, enc_rval.encoded);
+    ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_DL_CCCH_Message, &dl_ccch_msg);
 
     LOG_D(NR_RRC,"RRCReject Encoded %zd bits (%zd bytes)\n",
             enc_rval.encoded,(enc_rval.encoded+7)/8);
@@ -518,12 +519,10 @@ int do_RRCSetup(rrc_gNB_ue_context_t *const ue_context_pP,
   return ((enc_rval.encoded + 7) / 8);
 }
 
-int do_NR_SecurityModeCommand(
-  const protocol_ctxt_t *const ctxt_pP,
-  uint8_t *const buffer,
-  const uint8_t Transaction_id,
-  const uint8_t cipheringAlgorithm,
-  NR_IntegrityProtAlgorithm_t integrityProtAlgorithm)
+int do_NR_SecurityModeCommand(uint8_t *const buffer,
+                              const uint8_t Transaction_id,
+                              const uint8_t cipheringAlgorithm,
+                              NR_IntegrityProtAlgorithm_t integrityProtAlgorithm)
 //------------------------------------------------------------------------------
 {
   NR_DL_DCCH_Message_t dl_dcch_msg={0};
@@ -554,19 +553,13 @@ int do_NR_SecurityModeCommand(
   AssertFatal(enc_rval.encoded >0 , "ASN1 message encoding failed (%s, %lu)!\n",
               enc_rval.failed_type->name, enc_rval.encoded);
   ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_DL_DCCH_Message,&dl_dcch_msg);
-  LOG_D(NR_RRC, "[gNB %d] securityModeCommand for UE %lx Encoded %zd bits (%zd bytes)\n", ctxt_pP->module_id, ctxt_pP->rntiMaybeUEid, enc_rval.encoded, (enc_rval.encoded + 7) / 8);
 
   //  rrc_ue_process_ueCapabilityEnquiry(0,1000,&dl_dcch_msg.message.choice.c1.choice.ueCapabilityEnquiry,0);
   //  exit(-1);
   return((enc_rval.encoded+7)/8);
 }
 
-/*TODO*/
-//------------------------------------------------------------------------------
-int do_NR_SA_UECapabilityEnquiry(const protocol_ctxt_t *const ctxt_pP,
-                                 uint8_t               *const buffer,
-                                 const uint8_t         Transaction_id)
-//------------------------------------------------------------------------------
+int do_NR_SA_UECapabilityEnquiry(uint8_t *const buffer, const uint8_t Transaction_id)
 {
   NR_UE_CapabilityRequestFilterNR_t *sa_band_filter;
   NR_FreqBandList_t *sa_band_list;
@@ -608,6 +601,7 @@ int do_NR_SA_UECapabilityEnquiry(const protocol_ctxt_t *const ctxt_pP,
   if ( LOG_DEBUGFLAG(DEBUG_ASN1) ) {
     xer_fprint(stdout, &asn_DEF_NR_UE_CapabilityRequestFilterNR, (void *)sa_band_filter);
   }
+  ASN_STRUCT_FREE(asn_DEF_NR_UE_CapabilityRequestFilterNR, sa_band_filter);
 
   ue_capabilityrat_request->capabilityRequestFilter = req_freq;
 
@@ -625,7 +619,7 @@ int do_NR_SA_UECapabilityEnquiry(const protocol_ctxt_t *const ctxt_pP,
               enc_rval.failed_type->name, enc_rval.encoded);
   ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_DL_DCCH_Message, &dl_dcch_msg);
 
-  LOG_D(NR_RRC, "[gNB %d] NR UECapabilityRequest for UE %lx Encoded %zd bits (%zd bytes)\n", ctxt_pP->module_id, ctxt_pP->rntiMaybeUEid, enc_rval.encoded, (enc_rval.encoded + 7) / 8);
+  LOG_D(NR_RRC, "NR UECapabilityRequestEncoded %zd bits (%zd bytes)\n", enc_rval.encoded, (enc_rval.encoded + 7) / 8);
 
   return((enc_rval.encoded+7)/8);
 }
@@ -736,7 +730,7 @@ int do_RRCReconfiguration(const gNB_RRC_UE_t *UE,
 
     dl_dcch_msg.message.choice.c1->choice.rrcReconfiguration->criticalExtensions.choice.rrcReconfiguration = ie;
 
-    if ( LOG_DEBUGFLAG(DEBUG_ASN1) ) {
+    if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
       xer_fprint(stdout, &asn_DEF_NR_DL_DCCH_Message, (void *)&dl_dcch_msg);
     }
 
@@ -843,6 +837,7 @@ int do_NR_RRCReconfigurationComplete_for_nsa(
                                                   buffer_size);
   AssertFatal (enc_rval.encoded > 0, "ASN1 message encoding failed (%s, %lu)!\n",
                enc_rval.failed_type->name, enc_rval.encoded);
+  ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_RRCReconfigurationComplete, &rrc_complete_msg);
   LOG_A(NR_RRC, "rrcReconfigurationComplete Encoded %zd bits (%zd bytes)\n", enc_rval.encoded, (enc_rval.encoded+7)/8);
   return((enc_rval.encoded+7)/8);
 }
@@ -962,6 +957,8 @@ int do_NR_ULInformationTransfer(uint8_t **buffer, uint32_t pdu_length, uint8_t *
     encoded = uper_encode_to_new_buffer (&asn_DEF_NR_UL_DCCH_Message, NULL, (void *) &ul_dcch_msg, (void **) buffer);
     AssertFatal(encoded > 0,"ASN1 message encoding failed (%s, %ld)!\n",
                 "ULInformationTransfer",encoded);
+    ulInformationTransfer->dedicatedNAS_Message->buf = NULL; // Let caller decide when to free it
+    ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_UL_DCCH_Message, &ul_dcch_msg);
     LOG_D(NR_RRC,"ULInformationTransfer Encoded %zd bytes\n",encoded);
 
     return encoded;
@@ -1004,6 +1001,9 @@ int do_RRCReestablishmentRequest(uint8_t *buffer,
                                    buffer,
                                    100);
   AssertFatal (enc_rval.encoded > 0, "ASN1 message encoding failed (%s, %lu)!\n", enc_rval.failed_type->name, enc_rval.encoded);
+  // shortMAC_I.buf is on the stack, cannot free useing ASN_STRUCT_FREE macro
+  rrcReestablishmentRequest->rrcReestablishmentRequest.ue_Identity.shortMAC_I.buf = NULL;
+  ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_UL_CCCH_Message, &ul_ccch_msg);
   LOG_D(NR_RRC,"[UE] RRCReestablishmentRequest Encoded %zd bits (%zd bytes)\n", enc_rval.encoded, (enc_rval.encoded+7)/8);
   return((enc_rval.encoded+7)/8);
 }
@@ -1055,6 +1055,7 @@ int do_RRCReestablishment(rrc_gNB_ue_context_t *const ue_context_pP,
 
   AssertFatal(enc_rval.encoded > 0, "ASN1 message encoding failed (%s, %lu)!\n",
               enc_rval.failed_type->name, enc_rval.encoded);
+  ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_DL_DCCH_Message, &dl_dcch_msg);
 
   LOG_D(NR_RRC, "RRCReestablishment Encoded %u bits (%u bytes)\n", (uint32_t)enc_rval.encoded, (uint32_t)(enc_rval.encoded + 7) / 8);
   return ((enc_rval.encoded + 7) / 8);
@@ -1090,18 +1091,183 @@ int do_RRCReestablishmentComplete(uint8_t *buffer, size_t buffer_size, int64_t r
                                    buffer_size);
   AssertFatal (enc_rval.encoded > 0, "ASN1 message encoding failed (%s, %lu)!\n", enc_rval.failed_type->name, enc_rval.encoded);
   LOG_D(NR_RRC,"[UE] RRCReestablishmentComplete Encoded %zd bits (%zd bytes)\n", enc_rval.encoded, (enc_rval.encoded+7)/8);
+  ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_UL_DCCH_Message, &ul_dcch_msg);
   return((enc_rval.encoded+7)/8);
 }
 
-NR_MeasConfig_t *get_defaultMeasConfig(const NR_MeasTiming_t *mt, int band, int scs)
+static NR_ReportConfigToAddMod_t *prepare_periodic_event_report(const nr_per_event_t *per_event)
 {
-  DevAssert(mt != NULL && mt->frequencyAndTiming != NULL);
-  const struct NR_MeasTiming__frequencyAndTiming *ft = mt->frequencyAndTiming;
-  const NR_SSB_MTC_t *ssb_mtc = &ft->ssb_MeasurementTimingConfiguration;
+  NR_ReportConfigToAddMod_t *rc = calloc(1, sizeof(*rc));
+  rc->reportConfigId = 1;
+  rc->reportConfig.present = NR_ReportConfigToAddMod__reportConfig_PR_reportConfigNR;
+
+  NR_PeriodicalReportConfig_t *prc = calloc(1, sizeof(*prc));
+  prc->rsType = NR_NR_RS_Type_ssb;
+  prc->reportInterval = NR_ReportInterval_ms1024;
+  prc->reportAmount = NR_PeriodicalReportConfig__reportAmount_infinity;
+  prc->reportQuantityCell.rsrp = true;
+  prc->reportQuantityCell.rsrq = true;
+  prc->reportQuantityCell.sinr = true;
+  prc->reportQuantityRS_Indexes = calloc(1, sizeof(*prc->reportQuantityRS_Indexes));
+  prc->reportQuantityRS_Indexes->rsrp = true;
+  prc->reportQuantityRS_Indexes->rsrq = true;
+  prc->reportQuantityRS_Indexes->sinr = true;
+  asn1cCallocOne(prc->maxNrofRS_IndexesToReport, per_event->maxReportCells);
+  prc->maxReportCells = per_event->maxReportCells;
+  prc->includeBeamMeasurements = per_event->includeBeamMeasurements;
+
+  NR_ReportConfigNR_t *rcnr = calloc(1, sizeof(*rcnr));
+  rcnr->reportType.present = NR_ReportConfigNR__reportType_PR_periodical;
+  rcnr->reportType.choice.periodical = prc;
+
+  rc->reportConfig.choice.reportConfigNR = rcnr;
+  return rc;
+}
+
+static NR_ReportConfigToAddMod_t *prepare_a2_event_report(const nr_a2_event_t *a2_event)
+{
+  NR_ReportConfigToAddMod_t *rc_A2 = calloc(1, sizeof(*rc_A2));
+  rc_A2->reportConfigId = 2;
+  rc_A2->reportConfig.present = NR_ReportConfigToAddMod__reportConfig_PR_reportConfigNR;
+  NR_EventTriggerConfig_t *etrc_A2 = calloc(1, sizeof(*etrc_A2));
+  etrc_A2->eventId.present = NR_EventTriggerConfig__eventId_PR_eventA2;
+  etrc_A2->eventId.choice.eventA2 = calloc(1, sizeof(*etrc_A2->eventId.choice.eventA2));
+  etrc_A2->eventId.choice.eventA2->a2_Threshold.present = NR_MeasTriggerQuantity_PR_rsrp;
+  etrc_A2->eventId.choice.eventA2->a2_Threshold.choice.rsrp = a2_event->threshold_RSRP;
+  etrc_A2->eventId.choice.eventA2->reportOnLeave = false;
+  etrc_A2->eventId.choice.eventA2->hysteresis = 0;
+  etrc_A2->eventId.choice.eventA2->timeToTrigger = a2_event->timeToTrigger;
+  etrc_A2->rsType = NR_NR_RS_Type_ssb;
+  etrc_A2->reportInterval = NR_ReportInterval_ms480;
+  etrc_A2->reportAmount = NR_EventTriggerConfig__reportAmount_r4;
+  etrc_A2->reportQuantityCell.rsrp = true;
+  etrc_A2->reportQuantityCell.rsrq = true;
+  etrc_A2->reportQuantityCell.sinr = true;
+  asn1cCallocOne(etrc_A2->maxNrofRS_IndexesToReport, 4);
+  etrc_A2->maxReportCells = 1;
+  etrc_A2->includeBeamMeasurements = false;
+  NR_ReportConfigNR_t *rcnr_A2 = calloc(1, sizeof(*rcnr_A2));
+  rcnr_A2->reportType.present = NR_ReportConfigNR__reportType_PR_eventTriggered;
+  rcnr_A2->reportType.choice.eventTriggered = etrc_A2;
+  rc_A2->reportConfig.choice.reportConfigNR = rcnr_A2;
+
+  return rc_A2;
+}
+
+static NR_ReportConfigToAddMod_t *prepare_a3_event_report(const nr_a3_event_t *a3_event)
+{
+  NR_ReportConfigToAddMod_t *rc_A3 = calloc(1, sizeof(*rc_A3));
+  // 3 is default A3 Report Config ID. So cellId(0) specific Report Config ID
+  // starts from 4
+  rc_A3->reportConfigId = a3_event->pci == -1 ? 3 : a3_event->pci + 4;
+  rc_A3->reportConfig.present = NR_ReportConfigToAddMod__reportConfig_PR_reportConfigNR;
+  NR_EventTriggerConfig_t *etrc_A3 = calloc(1, sizeof(*etrc_A3));
+  etrc_A3->eventId.present = NR_EventTriggerConfig__eventId_PR_eventA3;
+  etrc_A3->eventId.choice.eventA3 = calloc(1, sizeof(*etrc_A3->eventId.choice.eventA3));
+  etrc_A3->eventId.choice.eventA3->a3_Offset.present = NR_MeasTriggerQuantityOffset_PR_rsrp;
+  etrc_A3->eventId.choice.eventA3->a3_Offset.choice.rsrp = a3_event->a3_offset;
+  etrc_A3->eventId.choice.eventA3->reportOnLeave = true;
+  etrc_A3->eventId.choice.eventA3->hysteresis = a3_event->hysteresis;
+  etrc_A3->eventId.choice.eventA3->timeToTrigger = a3_event->timeToTrigger;
+  etrc_A3->rsType = NR_NR_RS_Type_ssb;
+  etrc_A3->reportInterval = NR_ReportInterval_ms1024;
+  etrc_A3->reportAmount = NR_EventTriggerConfig__reportAmount_r4;
+  etrc_A3->reportQuantityCell.rsrp = true;
+  etrc_A3->reportQuantityCell.rsrq = true;
+  etrc_A3->reportQuantityCell.sinr = true;
+  asn1cCallocOne(etrc_A3->maxNrofRS_IndexesToReport, 4);
+  etrc_A3->maxReportCells = 4;
+  etrc_A3->includeBeamMeasurements = false;
+  NR_ReportConfigNR_t *rcnr_A3 = calloc(1, sizeof(*rcnr_A3));
+  rcnr_A3->reportType.present = NR_ReportConfigNR__reportType_PR_eventTriggered;
+  rcnr_A3->reportType.choice.eventTriggered = etrc_A3;
+  rc_A3->reportConfig.choice.reportConfigNR = rcnr_A3;
+  return rc_A3;
+}
+
+const nr_a3_event_t *get_a3_configuration(int pci)
+{
+  gNB_RRC_INST *rrc = RC.nrrrc[0];
+  nr_measurement_configuration_t *measurementConfiguration = &rrc->measurementConfiguration;
+  if (!measurementConfiguration->a3_event_list)
+    return NULL;
+
+  for (uint8_t i = 0; i < measurementConfiguration->a3_event_list->size; i++) {
+    nr_a3_event_t *a3_event = (nr_a3_event_t *)seq_arr_at(measurementConfiguration->a3_event_list, i);
+    if (a3_event->pci == pci)
+      return a3_event;
+  }
+
+  if (measurementConfiguration->is_default_a3_configuration_exists)
+    return get_a3_configuration(-1);
+
+  return NULL;
+}
+
+NR_MeasConfig_t *get_MeasConfig(const NR_MeasTiming_t *mt,
+                                int band,
+                                int scs,
+                                const nr_measurement_configuration_t *const measurementConfiguration,
+                                const seq_arr_t *const neighbourConfiguration)
+{
+  if (!measurementConfiguration)
+    return NULL;
+
+  if (!measurementConfiguration->a2_event && !measurementConfiguration->per_event && !measurementConfiguration->a3_event_list) {
+    LOG_D(NR_RRC, "NR Measurements are not configured in the conf file\n");
+    return NULL;
+  }
+
+  if (!measurementConfiguration->a2_event && !measurementConfiguration->per_event && measurementConfiguration->a3_event_list
+      && !neighbourConfiguration) {
+    LOG_I(NR_RRC, "A2 and Periodical Events are off. A3 Can not be prepared without neighbours!\n");
+    return NULL;
+  }
 
   NR_MeasConfig_t *mc = calloc(1, sizeof(*mc));
   mc->measObjectToAddModList = calloc(1, sizeof(*mc->measObjectToAddModList));
   mc->reportConfigToAddModList = calloc(1, sizeof(*mc->reportConfigToAddModList));
+  mc->measIdToAddModList = calloc(1, sizeof(*mc->measIdToAddModList));
+
+  if (measurementConfiguration->per_event) {
+    NR_ReportConfigToAddMod_t *rc_PER = prepare_periodic_event_report(measurementConfiguration->per_event);
+    asn1cSeqAdd(&mc->reportConfigToAddModList->list, rc_PER);
+  }
+
+  if (measurementConfiguration->a2_event) {
+    LOG_D(NR_RRC, "HO LOG: Preparing A2 Event Measurement Configuration!\n");
+    NR_ReportConfigToAddMod_t *rc_A2 = prepare_a2_event_report(measurementConfiguration->a2_event);
+    asn1cSeqAdd(&mc->reportConfigToAddModList->list, rc_A2);
+  }
+
+  if (neighbourConfiguration && measurementConfiguration->a3_event_list && measurementConfiguration->a3_event_list->size > 0) {
+    /* Loop through neighbours and find related A3 configuration
+       If no related A3 but there is default add the default one.
+       If default one added once as a report, no need to add it again && duplication.
+    */
+    LOG_D(NR_RRC, "HO LOG: Preparing A3 Event Measurement Configuration!\n");
+    bool is_default_a3_added = false;
+    for (uint8_t neighbourIdx = 0; neighbourIdx < neighbourConfiguration->size; neighbourIdx++) {
+      const nr_neighbour_gnb_configuration_t *neighbourCell =
+          (const nr_neighbour_gnb_configuration_t *)seq_arr_at(neighbourConfiguration, neighbourIdx);
+      if (!neighbourCell->isIntraFrequencyNeighbour)
+        continue;
+
+      const nr_a3_event_t *a3Event = get_a3_configuration(neighbourCell->physicalCellId);
+      if (!a3Event || is_default_a3_added)
+        continue;
+
+      if (a3Event->pci == -1)
+        is_default_a3_added = true;
+
+      NR_ReportConfigToAddMod_t *rc_A3 = prepare_a3_event_report(a3Event);
+      asn1cSeqAdd(&mc->reportConfigToAddModList->list, rc_A3);
+    }
+  }
+
+  DevAssert(mt != NULL && mt->frequencyAndTiming != NULL);
+  const struct NR_MeasTiming__frequencyAndTiming *ft = mt->frequencyAndTiming;
+  const NR_SSB_MTC_t *ssb_mtc = &ft->ssb_MeasurementTimingConfiguration;
 
   // Measurement Objects: Specifies what is to be measured. For NR and inter-RAT E-UTRA measurements, this may include
   // cell-specific offsets, blacklisted cells to be ignored and whitelisted cells to consider for measurements.
@@ -1122,62 +1288,48 @@ NR_MeasConfig_t *get_defaultMeasConfig(const NR_MeasTiming_t *mt, int band, int 
   monr1->quantityConfigIndex = 1;
   monr1->ext1 = calloc(1, sizeof(*monr1->ext1));
   asn1cCallocOne(monr1->ext1->freqBandIndicatorNR, band);
+
+  if (neighbourConfiguration && measurementConfiguration->a3_event_list) {
+    for (uint8_t nCell = 0; nCell < neighbourConfiguration->size; nCell++) {
+      const nr_neighbour_gnb_configuration_t *neighbourCell =
+          (const nr_neighbour_gnb_configuration_t *)seq_arr_at(neighbourConfiguration, nCell);
+      if (!neighbourCell->isIntraFrequencyNeighbour)
+        continue;
+
+      if (monr1->cellsToAddModList == NULL) {
+        monr1->cellsToAddModList = calloc(1, sizeof(*monr1->cellsToAddModList));
+      }
+
+      NR_CellsToAddMod_t *cell = calloc(1, sizeof(*cell));
+      cell->physCellId = neighbourCell->physicalCellId;
+      ASN_SEQUENCE_ADD(&monr1->cellsToAddModList->list, cell);
+    }
+  }
+
   mo1->measObject.choice.measObjectNR = monr1;
   asn1cSeqAdd(&mc->measObjectToAddModList->list, mo1);
-  
-  // Reporting Configuration: Specifies how reporting should be done. This could be periodic or event-triggered.
-  NR_ReportConfigToAddMod_t *rc = calloc(1, sizeof(*rc));
-  rc->reportConfigId = 1;
-  rc->reportConfig.present = NR_ReportConfigToAddMod__reportConfig_PR_reportConfigNR;
 
-  NR_PeriodicalReportConfig_t *prc = calloc(1, sizeof(*prc));
-  prc->rsType = NR_NR_RS_Type_ssb;
-  prc->reportInterval = NR_ReportInterval_ms1024;
-  prc->reportAmount = NR_PeriodicalReportConfig__reportAmount_infinity;
-  prc->reportQuantityCell.rsrp = true;
-  prc->reportQuantityCell.rsrq = true;
-  prc->reportQuantityCell.sinr = true;
-  prc->reportQuantityRS_Indexes = calloc(1, sizeof(*prc->reportQuantityRS_Indexes));
-  prc->reportQuantityRS_Indexes->rsrp = true;
-  prc->reportQuantityRS_Indexes->rsrq = true;
-  prc->reportQuantityRS_Indexes->sinr = true;
-  asn1cCallocOne(prc->maxNrofRS_IndexesToReport, 4);
-  prc->maxReportCells = 4;
-  prc->includeBeamMeasurements = true;
+  // Preparation of measId
+  for (uint8_t reportIdx = 0; reportIdx < mc->reportConfigToAddModList->list.count; reportIdx++) {
+    const NR_ReportConfigId_t reportId = mc->reportConfigToAddModList->list.array[reportIdx]->reportConfigId;
+    NR_MeasIdToAddMod_t *measid = calloc(1, sizeof(NR_MeasIdToAddMod_t));
+    measid->measId = reportIdx + 1;
+    measid->reportConfigId = reportId;
+    measid->measObjectId = 1;
+    asn1cSeqAdd(&mc->measIdToAddModList->list, measid);
+  }
 
-  NR_ReportConfigNR_t *rcnr = calloc(1, sizeof(*rcnr));
-  rcnr->reportType.present = NR_ReportConfigNR__reportType_PR_periodical;
-  rcnr->reportType.choice.periodical = prc;
-
-
-  rc->reportConfig.choice.reportConfigNR = rcnr;
-  asn1cSeqAdd(&mc->reportConfigToAddModList->list, rc);
-
-  // Measurement ID: Identifies how to report measurements of a specific object. This is a many-to-many mapping: a
-  // measurement object could have multiple reporting configurations, a reporting configuration could apply to multiple
-  // objects. A unique ID is used for each object-to-report-config association. When UE sends a MeasurementReport
-  // message, a single ID and related measurements are included in the message.
-  mc->measIdToAddModList = calloc(1, sizeof(*mc->measIdToAddModList));
-  NR_MeasIdToAddMod_t *measid = calloc(1, sizeof(*measid));
-  measid->measId = 1;
-  measid->measObjectId = 1;
-  measid->reportConfigId = 1;
-  asn1cSeqAdd(&mc->measIdToAddModList->list, measid);
-
-  // Quantity Configuration: Specifies parameters for layer 3 filtering of measurements. Only after filtering, reporting
-  // criteria are evaluated. The formula used is F_n = (1-a)F_(n-1) + a*M_n, where M is the latest measurement, F is the
-  // filtered measurement, and ais based on configured filter coefficient.
   mc->quantityConfig = calloc(1, sizeof(*mc->quantityConfig));
   mc->quantityConfig->quantityConfigNR_List = calloc(1, sizeof(*mc->quantityConfig->quantityConfigNR_List));
-  NR_QuantityConfigNR_t *qcnr3 = calloc(1, sizeof(*qcnr3));
-  asn1cCallocOne(qcnr3->quantityConfigCell.ssb_FilterConfig.filterCoefficientRSRP, NR_FilterCoefficient_fc6);
-  asn1cCallocOne(qcnr3->quantityConfigCell.csi_RS_FilterConfig.filterCoefficientRSRP, NR_FilterCoefficient_fc6);
-  asn1cSeqAdd(&mc->quantityConfig->quantityConfigNR_List->list, qcnr3);
+  NR_QuantityConfigNR_t *qcnr = calloc(1, sizeof(*qcnr));
+  asn1cCallocOne(qcnr->quantityConfigCell.ssb_FilterConfig.filterCoefficientRSRP, NR_FilterCoefficient_fc6);
+  asn1cCallocOne(qcnr->quantityConfigCell.csi_RS_FilterConfig.filterCoefficientRSRP, NR_FilterCoefficient_fc6);
+  asn1cSeqAdd(&mc->quantityConfig->quantityConfigNR_List->list, qcnr);
 
   return mc;
 }
 
-void free_defaultMeasConfig(NR_MeasConfig_t *mc)
+void free_MeasConfig(NR_MeasConfig_t *mc)
 {
   ASN_STRUCT_FREE(asn_DEF_NR_MeasConfig, mc);
 }
@@ -1185,7 +1337,7 @@ void free_defaultMeasConfig(NR_MeasConfig_t *mc)
 int do_NR_Paging(uint8_t Mod_id, uint8_t *buffer, uint32_t tmsi)
 {
   LOG_D(NR_RRC, "[gNB %d] do_NR_Paging start\n", Mod_id);
-  NR_PCCH_Message_t pcch_msg;
+  NR_PCCH_Message_t pcch_msg = {0};
   pcch_msg.message.present           = NR_PCCH_MessageType_PR_c1;
   asn1cCalloc(pcch_msg.message.choice.c1, c1);
   c1->present = NR_PCCH_MessageType__c1_PR_paging;
@@ -1207,7 +1359,11 @@ int do_NR_Paging(uint8_t Mod_id, uint8_t *buffer, uint32_t tmsi)
   LOG_D(NR_RRC, "[gNB %d] do_Paging paging_record: PagingRecordList.count %d\n",
         Mod_id, c1->choice.paging->pagingRecordList->list.count);
   asn_enc_rval_t enc_rval = uper_encode_to_buffer(
-      &asn_DEF_NR_PCCH_Message, NULL, (void *)&pcch_msg, buffer, RRC_BUF_SIZE);
+      &asn_DEF_NR_PCCH_Message, NULL, (void *)&pcch_msg, buffer, NR_RRC_BUF_SIZE);
+
+  if ( LOG_DEBUGFLAG(DEBUG_ASN1) ) {
+    xer_fprint(stdout, &asn_DEF_NR_PCCH_Message, (void *)&pcch_msg);
+  }
   ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_PCCH_Message, &pcch_msg);
   if(enc_rval.encoded == -1) {
     LOG_I(NR_RRC, "[gNB AssertFatal]ASN1 message encoding failed (%s, %lu)!\n",
@@ -1215,9 +1371,44 @@ int do_NR_Paging(uint8_t Mod_id, uint8_t *buffer, uint32_t tmsi)
     return -1;
   }
 
-  if ( LOG_DEBUGFLAG(DEBUG_ASN1) ) {
-    xer_fprint(stdout, &asn_DEF_NR_PCCH_Message, (void *)&pcch_msg);
+  return((enc_rval.encoded+7)/8);
+}
+
+/* \brief generate HandoverPreparationInformation to be sent to the DU for
+ * handover. Takes uecap_buf in encoded form as (1) this is the form present at
+ * the CU already (2) we have to clone this information anyway, so can take it
+ * in encoded form which we decode + add to the handoverPreparationInformation */
+int do_NR_HandoverPreparationInformation(const uint8_t *uecap_buf, int uecap_buf_size, uint8_t *buf, int buf_size)
+{
+  NR_HandoverPreparationInformation_t *hpi = calloc(1, sizeof(*hpi));
+  AssertFatal(hpi != NULL, "out of memory\n");
+  hpi->criticalExtensions.present = NR_HandoverPreparationInformation__criticalExtensions_PR_c1;
+  hpi->criticalExtensions.choice.c1 = calloc(1, sizeof(*hpi->criticalExtensions.choice.c1));
+  AssertFatal(hpi->criticalExtensions.choice.c1 != NULL, "out of memory\n");
+  hpi->criticalExtensions.choice.c1->present =
+      NR_HandoverPreparationInformation__criticalExtensions__c1_PR_handoverPreparationInformation;
+  NR_HandoverPreparationInformation_IEs_t *hpi_ie = calloc(1, sizeof(*hpi_ie));
+  AssertFatal(hpi_ie != NULL, "out of memory\n");
+  hpi->criticalExtensions.choice.c1->choice.handoverPreparationInformation = hpi_ie;
+
+  NR_UE_CapabilityRAT_ContainerList_t *list = NULL;
+  asn_dec_rval_t dec_rval =
+      uper_decode_complete(NULL, &asn_DEF_NR_UE_CapabilityRAT_ContainerList, (void **)&list, uecap_buf, uecap_buf_size);
+  if (dec_rval.code == RC_OK) {
+    hpi_ie->ue_CapabilityRAT_List = *list;
+    free(list); /* list itself is not needed, members below will be freed in ASN_STRUCT_FREE */
+  } else {
+    /* problem with decoding, don't put a capability */
+    ASN_STRUCT_FREE(asn_DEF_NR_UE_CapabilityRAT_ContainerList, list);
+    list = NULL;
   }
 
-  return((enc_rval.encoded+7)/8);
+  if (LOG_DEBUGFLAG(DEBUG_ASN1))
+    xer_fprint(stdout, &asn_DEF_NR_HandoverPreparationInformation, hpi);
+
+  asn_enc_rval_t enc_rval = uper_encode_to_buffer(&asn_DEF_NR_HandoverPreparationInformation, NULL, hpi, buf, buf_size);
+  AssertFatal(enc_rval.encoded > 0, "ASN1 message encoding failed (%s, %lu)!\n", enc_rval.failed_type->name, enc_rval.encoded);
+
+  ASN_STRUCT_FREE(asn_DEF_NR_HandoverPreparationInformation, hpi);
+  return (enc_rval.encoded + 7) / 8;
 }

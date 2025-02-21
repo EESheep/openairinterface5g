@@ -23,7 +23,7 @@
 | avra          | 172.21.16.124   | CI-Avra-Usage         | gNB (n78)          | AW2S Jaguar (192.168.80.239)                          |
 | orion         | 172.21.16.134   | CI-Orion-Build-Sanity-Check-Deploy-Test, CI-Orion-DsTester-Deploy-Test | Build | |
 | aerial2       | 172.21.16.131   | CI-Aerial2-Usage      | gNB (PNF/Nvidia CUBB + VNF) | Foxconn RU, _Nvidia Aerial SDK integrated_   |
-| sphex         | 172.21.17.54    | CI-Sphex-Usage        | COTS UE            | Quectel RM500Q                                        |
+| cacofonix     | 172.21.16.150   | CI-Cacofonix-Usage    | gNB (n78, FHI7.2)  |                                                       |
 | matix         | 172.21.19.58    | CI-Matix-Usage        | gNB (n77)          | N310                                                  |
 
 Note: The available resources, and their current usage, is indicated here:
@@ -38,7 +38,7 @@ Note: The available resources, and their current usage, is indicated here:
 
 ![5G OTA Testbench](testbenches_doc_resources/5g-ota-bench.png)
 
-[PDF version](testbenches_doc_resources/5g-ota-bench.pdf) | [LaTeX/TikZ version](testbenches_doc_resources/5g-ota-bench.tex) if you want to modify to reflect your setup
+[LaTeX/TikZ version](testbenches_doc_resources/5g-ota-bench.tex) if you want to modify to reflect your setup
 
 
 ### 5G NSA/Faraday Cage Testbench
@@ -89,8 +89,8 @@ information on how the images are built.
 - [RAN-ARM-Cross-Compile-Builder](https://jenkins-oai.eurecom.fr/job/RAN-ARM-Cross-Compile-Builder/)
   ~BUILD-ONLY ~4G-LTE ~5G-NR
   - orion: Cross-compilation from Intel to ARM
-  - base image from `Dockerfile.base.ubuntu20.cross-arm64`
-  - build image from `Dockerfile.build.ubuntu20.cross-arm64` (no target images)
+  - base image from `Dockerfile.base.ubuntu22.cross-arm64`
+  - build image from `Dockerfile.build.ubuntu22.cross-arm64` (no target images)
 - [RAN-cppcheck](https://jenkins-oai.eurecom.fr/job/RAN-cppcheck/)
   ~BUILD-ONLY ~4G-LTE ~5G-NR
   - bellatrix
@@ -112,39 +112,33 @@ information on how the images are built.
 - [RAN-Ubuntu18-Image-Builder](https://jenkins-oai.eurecom.fr/job/RAN-Ubuntu18-Image-Builder/)
   ~BUILD-ONLY ~4G-LTE ~5G-NR
   - run formatting check from `ci-scripts/docker/Dockerfile.formatting.bionic`
-  - obelix: Ubuntu 20 image build using docker (Note: builds U20 images while pipeline is named U18!)
-  - base image from `Dockerfile.base.ubuntu20`
-  - build image from `Dockerfile.build.ubuntu20`, followed by
-    - target image from `Dockerfile.eNB.ubuntu20`
-    - target image from `Dockerfile.gNB.ubuntu20`
-    - target image from `Dockerfile.nr-cuup.ubuntu20`
-    - target image from `Dockerfile.nrUE.ubuntu20`
-    - target image from `Dockerfile.lteUE.ubuntu20`
-    - target image from `Dockerfile.lteRU.ubuntu20`
-  - build unit tests from `ci-scripts/docker/Dockerfile.unittest.ubuntu20`, and run them
+  - obelix: Ubuntu 22 image build using docker (Note: builds U22 images while pipeline is named U18!)
+  - base image from `Dockerfile.base.ubuntu22`
+  - build image from `Dockerfile.build.ubuntu22`, followed by
+    - target image from `Dockerfile.eNB.ubuntu22`
+    - target image from `Dockerfile.gNB.ubuntu22`
+    - target image from `Dockerfile.nr-cuup.ubuntu22`
+    - target image from `Dockerfile.nrUE.ubuntu22`
+    - target image from `Dockerfile.lteUE.ubuntu22`
+    - target image from `Dockerfile.lteRU.ubuntu22`
+  - build unit tests from `ci-scripts/docker/Dockerfile.unittest.ubuntu22`, and run them
 
 #### Image Test pipelines
 
 - [OAI-CN5G-COTS-UE-Test](https://jenkins-oai.eurecom.fr/job/OAI-CN5G-COTS-UE-Test/)
   ~5G-NR
   - using 5GC bench (resources `CI-Cetautomatix-OC-oaicicd-session`, `CI-Dogmatix-CN5G-gNB`): Attach/Detach of UE with multiple PDU sessions
+- [OAI-FLEXRIC-RAN-Integration-Test](https://jenkins-oai.eurecom.fr/job/OAI-FLEXRIC-RAN-Integration-Test/) ~5G-NR
+  - selfix (gNB, nrUE, OAI 5GC, FlexRIC)
+  - uses RFsimulator, tests FlexRIC/E2 interface and xApps
 - [RAN-gNB-N300-Timing-Phytest-LDPC](https://jenkins-oai.eurecom.fr/view/RAN/job/RAN-gNB-N300-Timing-Phytest-LDPC/)
   ~5G-NR
   - caracal + N310
   - pure performance test through phy-test scheduler, see command line for more details
-- [RAN-Interop-F1](https://jenkins-oai.eurecom.fr/job/RAN-Interop-F1/)
-  ~5G-NR
-  - ofqot (DU, 1x UE)
-  - F1 interoperability: set up connection between Accelleran CU and OAI DU and pass all traffic over F1
-  - 3rd-party gNB/CU interoperability: set up connection between Accelleran CU and OAI UE and test connectivity
 - [RAN-L2-Sim-Test-4G](https://jenkins-oai.eurecom.fr/job/RAN-L2-Sim-Test-4G/)
   ~4G-LTE
   - obelix (eNB, 1x UE, OAI EPC)
   - L2simulator: skips physical layer and uses proxy between eNB and UE
-- [RAN-L2-Sim-Test-5G](https://jenkins-oai.eurecom.fr/job/RAN-L2-Sim-Test-5G/)
-  ~5G-NR
-  - obelix (gNB, 1x UE, OAI 5GC)
-  - L2simulator: skips physical layer and uses proxy between gNB and UE, currently only ping
 - [RAN-LTE-FDD-LTEBOX-Container](https://jenkins-oai.eurecom.fr/job/RAN-LTE-FDD-LTEBOX-Container/)
   ~4G-LTE
   - hutch + B210, nano w/ ltebox + 2x UE
@@ -169,17 +163,18 @@ information on how the images are built.
   ~4G-LTE ~5G-NR
   - cluster (`Asterix-OC-oaicicd-session` resource), tests in OpenShift Cluster
   - unitary simulators (`nr_dlsim`, etc.)
+  - see [`./physical-simulators.md`](./physical-simulators.md) for an overview
 - [RAN-RF-Sim-Test-4G](https://jenkins-oai.eurecom.fr/job/RAN-RF-Sim-Test-4G/)
   ~4G-LTE
-  - obelix (eNB, lteUE, OAI EPC)
+  - cacofonix (eNB, lteUE, OAI EPC)
   - uses RFsimulator, for FDD 5, 10, 20MHz with core, 5MHz noS1
 - [RAN-RF-Sim-Test-5G](https://jenkins-oai.eurecom.fr/job/RAN-RF-Sim-Test-5G/)
   ~5G-NR
-  - obelix (gNB, nrUE, OAI 5GC)
+  - cacofonix (gNB, nrUE, OAI 5GC)
   - uses RFsimulator, TDD 40MHz, FDD 40MHz, F1 split
 - [RAN-SA-AW2S-CN5G](https://jenkins-oai.eurecom.fr/job/RAN-SA-AW2S-CN5G/)
   ~5G-NR
-  - 5G-NR SA test setup: avra(RHEL9.1) + AW2S, amariue, OAI CN5G
+  - 5G-NR SA test setup: avra + AW2S, amariue, OAI CN5G
   - uses OpenShift cluster for CN deployment and container images for gNB deployment
   - multi UE testing using Amarisoft UE simulator
 - [RAN-SA-B200-Module-SABOX-Container](https://jenkins-oai.eurecom.fr/job/RAN-SA-B200-Module-SABOX-Container/)
@@ -188,16 +183,21 @@ information on how the images are built.
   - basic SA test (20 MHz TDD), F1, reestablishment, ...
 - [RAN-SA-OAIUE-CN5G](https://jenkins-oai.eurecom.fr/job/RAN-SA-OAIUE-CN5G/)
   ~5G-NR
-  - 5G-NR SA test setup: gNB on avra(RHEL9.2) + N310, OAIUE on caracal(RHEL9.1) + N310, OAI CN5G
+  - 5G-NR SA test setup: gNB on avra + N310, OAIUE on caracal + N310, OAI CN5G
   - OpenShift cluster for CN deployment and container images for gNB and UE deployment
 - [RAN-SA-AERIAL-CN5G](https://jenkins-oai.eurecom.fr/job/RAN-SA-AERIAL-CN5G/)
   ~5G-NR
-  - 5G-NR SA test setup: OAI VNF  + PNF/NVIDIA CUBB on Aerial2 (U22) + Foxconn RU, sphex + COTS UE (Quectel RM500Q), OAI CN5G
+  - 5G-NR SA test setup: OAI VNF + PNF/NVIDIA CUBB on Aerial2 + Foxconn RU, up2 + COTS UE (Quectel RM520N), OAI CN5G
   - container images for gNB deployment
 - [RAN-SA-2x2-Module-CN5G](https://jenkins-oai.eurecom.fr/view/RAN/job/RAN-SA-2x2-Module-CN5G/)
   ~5G-NR
   - matix + N310 (gNB), up2 + COTS UE (Quectel RM520N), OAI 5GC deployed in docker on matix
   - NR performance tests: 2x2 configuration, 60 MHz and 100 MHz bandwidth
+- [RAN-SA-FHI72-CN5G](https://jenkins-oai.eurecom.fr/view/RAN/job/RAN-SA-FHI72-CN5G/)
+  ~5G-NR
+  - cacofonix + FHI72 + Metanoia (gNB), up2 (Quectel RM520N UE), OAI CN5G
+  - OpenShift cluster for CN deployment
+  - FHI 7.2 testing with 100 MHz bandwidth, 2 layers in DL
 
 ### RAN-CI-NSA-Trigger
 
@@ -242,10 +242,10 @@ steps look like this:
    `ci-scripts/conf_files/gnb.sa.band78.106prb.rfsim.conf` (note that the path
    is relative to the directory in which the docker-compose file is located).
    Further, an environment variable `USE_ADDITIONAL_OPTIONS` is declared,
-   referencing the relevant options `--sa -E --rfsim` (you can ignore logging
+   referencing the relevant options `-E --rfsim` (you can ignore logging
    options). You would therefore run the gNB from source like this:
    ```
-   sudo ./cmake_targets/ran_build/build/nr-softmodem -O ci-scripts/conf_files/gnb.sa.band78.106prb.rfsim.conf --sa -E --rfsim
+   sudo ./cmake_targets/ran_build/build/nr-softmodem -O ci-scripts/conf_files/gnb.sa.band78.106prb.rfsim.conf -E --rfsim
    ```
    To run this on your local machine, assuming you have a 5GC installed, you
    might need to change IP information in the config to match your core.

@@ -118,7 +118,7 @@ one_measurement_t test_ldpc(short max_iterations,
 
   double sigma;
   sigma = 1.0/sqrt(2*SNR);
-  opp_enabled=1;
+  cpu_meas_enabled = 1;
   //short test_input[block_length];
   uint8_t *test_input[MAX_NUM_NR_DLSCH_SEGMENTS_PER_LAYER * NR_MAX_NB_LAYERS];
   uint8_t estimated_output[MAX_NUM_DLSCH_SEGMENTS][block_length];
@@ -259,7 +259,7 @@ one_measurement_t test_ldpc(short max_iterations,
   printf("To: %d\n", (Kb + nrows - no_punctured_columns) * Zc - removed_bit);
   printf("number of undecoded bits: %d\n", (Kb + nrows - no_punctured_columns - 2) * Zc - removed_bit);
 
-  encoder_implemparams_t impp = {.Zc = Zc, .Kb = Kb, .E = block_length, .BG = BG, .Kr = block_length, .K = block_length};
+  encoder_implemparams_t impp = {.Zc = Zc, .Kb = Kb, .BG = BG, .K = block_length};
   impp.gen_code = 2;
 
   if (ntrials==0)
@@ -323,7 +323,7 @@ one_measurement_t test_ldpc(short max_iterations,
         decParams[j].R = code_rate_vec[R_ind]; // 13;
         decParams[j].numMaxIter = max_iterations;
         decParams[j].outMode = nrLDPC_outMode_BIT;
-        decParams[j].E = block_length;
+        decParams[j].Kprime = block_length;
         ldpc_toCompare.LDPCinit();
     }
     for (int j = 0; j < n_segments; j++) {
@@ -403,7 +403,7 @@ int main(int argc, char *argv[])
 {
   short block_length=8448; // decoder supports length: 1201 -> 1280, 2401 -> 2560
   // default to check output inside ldpc, the NR version checks the outer CRC defined by 3GPP
-  char *ldpc_version = NULL;
+  char *ldpc_version = "";
   /* version of the ldpc decoder library to use (XXX suffix to use when loading libldpc_XXX.so */
   short max_iterations=5;
   int n_segments=1;
@@ -430,11 +430,11 @@ int main(int argc, char *argv[])
   }
   logInit();
 
-  while ((c = getopt (argc, argv, "--:q:r:s:S:l:G:n:d:i:t:u:hv:")) != -1) {
+  while ((c = getopt (argc, argv, "--:O:q:r:s:S:l:G:n:d:i:t:u:hv:")) != -1) {
 
-    /* ignore long options starting with '--' and their arguments that are handled by configmodule */
+    /* ignore long options starting with '--', option '-O' and their arguments that are handled by configmodule */
     /* with this opstring getopt returns 1 for non-option arguments, refer to 'man 3 getopt' */
-    if (c == 1 || c == '-')
+    if (c == 1 || c == '-' || c == 'O')
       continue;
 
     printf("handling optarg %c\n",c);
